@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WD14 Captioning</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body.dark-mode {
+            background-color: #282c34; /* Deeper slate-black background */
+            color: #d1d5db; /* Lighter, more readable text */
+        }
+
+        body.dark-mode .form-control,
+        body.dark-mode .form-select {
+            background-color: #3d424e; /* Darker input backgrounds */
+            color: #d1d5db;
+            border-color: #5a606b;
+        }
+
+        body.dark-mode .form-check-label {
+            color: #d1d5db;
+        }
+
+        body.dark-mode .btn-outline-secondary {
+            color: #d1d5db;
+            border-color: #5a606b;
+        }
+
+        body.dark-mode .btn-outline-secondary:hover {
+            background-color: #3d424e;
+        }
+
+        body.dark-mode .form-control:focus,
+        body.dark-mode .form-select:focus {
+            background-color: #3d424e;
+            color: #d1d5db;
+            border-color: #6699cc; /* Slightly brighter focus border */
+            box-shadow: 0 0 0 0.25rem rgba(102, 153, 204, 0.25);
+        }
+
+        body.dark-mode .table {
+            color: #d1d5db;
+        }
+
+        body.dark-mode .table th,
+        body.dark-mode .table td {
+            border-color: #5a606b;
+        }
+
+        body.dark-mode .table thead th {
+            border-color: #666c77;
+        }
+
+        body.dark-mode .table tbody tr:nth-child(even) {
+          background-color: #33373f;
+        }
+
+        body.dark-mode .table tbody tr:nth-child(odd) {
+          background-color: #282c34;
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+    <div class="container mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>WD14 Captioning</h1>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="darkModeToggle">
+                <label class="form-check-label" for="darkModeToggle">Dark Mode</label>
+            </div>
+        </div>
+        <form method="POST" class="row g-3">
+            <div class="col-md-6">
+                <label for="train_data_dir" class="form-label">Image Folder:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="train_data_dir" name="train_data_dir">
+                    <button class="btn btn-outline-secondary" type="button" id="browseFolder">Browse</button>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label for="caption_extension" class="form-label">Caption Extension:</label>
+                <input type="text" class="form-control" id="caption_extension" name="caption_extension" value=".txt">
+            </div>
+            <div class="col-md-6">
+                <label for="batch_size" class="form-label">Batch Size:</label>
+                <input type="number" class="form-control" id="batch_size" name="batch_size" value="1">
+            </div>
+            <div class="col-md-6">
+                <label for="general_threshold" class="form-label">General Threshold:</label>
+                <input type="number" class="form-control" id="general_threshold" name="general_threshold" value="0.35" step="0.05">
+            </div>
+            <div class="col-md-6">
+                <label for="character_threshold" class="form-label">Character Threshold:</label>
+                <input type="number" class="form-control" id="character_threshold" name="character_threshold" value="0.35" step="0.05">
+            </div>
+            <div class="col-md-6">
+                <label for="repo_id" class="form-label">Repo ID:</label>
+                <select class="form-select" id="repo_id" name="repo_id">
+                    <option value="SmilingWolf/wd-v1-4-convnext-tagger-v2">SmilingWolf/wd-v1-4-convnext-tagger-v2</option>
+                    <option value="SmilingWolf/wd-v1-4-convnextv2-tagger-v2" selected>SmilingWolf/wd-v1-4-convnextv2-tagger-v2</option>
+                    <option value="SmilingWolf/wd-v1-4-vit-tagger-v2">SmilingWolf/wd-v1-4-vit-tagger-v2</option>
+                    <option value="SmilingWolf/wd-v1-4-swinv2-tagger-v2">SmilingWolf/wd-v1-4-swinv2-tagger-v2</option>
+                    <option value="SmilingWolf/wd-v1-4-moat-tagger-v2">SmilingWolf/wd-v1-4-moat-tagger-v2</option>
+                    <option value="SmilingWolf/wd-swinv2-tagger-v3">SmilingWolf/wd-swinv2-tagger-v3</option>
+                    <option value="SmilingWolf/wd-vit-tagger-v3">SmilingWolf/wd-vit-tagger-v3</option>
+                    <option value="SmilingWolf/wd-convnext-tagger-v3">SmilingWolf/wd-convnext-tagger-v3</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="recursive" name="recursive">
+                    <label class="form-check-label" for="recursive">Recursive</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label for="max_data_loader_n_workers" class="form-label">Max Data Loader Workers:</label>
+                <input type="number" class="form-control" id="max_data_loader_n_workers" name="max_data_loader_n_workers" value="2">
+            </div>
+            <div class="col-md-6">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="debug" name="debug">
+                    <label class="form-check-label" for="debug">Debug</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label for="undesired_tags" class="form-label">Undesired Tags:</label>
+                <input type="text" class="form-control" id="undesired_tags" name="undesired_tags">
+            </div>
+            <div class="col-md-6">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="frequency_tags" name="frequency_tags" checked>
+                    <label class="form-check-label" for="frequency_tags">Frequency Tags</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label for="always_first_tags" class="form-label">Always First Tags:</label>
+                <input type="text" class="form-control" id="always_first_tags" name="always_first_tags">
+            </div>
+            <div class="col-md-6">
+                <div class="form-check">
+<input type="checkbox" class="form-check-input" id="onnx" name="onnx" checked>
+                    <label class="form-check-label" for="onnx">Use ONNX</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="append_tags" name="append_tags">
+                    <label class="form-check-label" for="append_tags">Append Tags</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="force_download" name="force_download">
+                    <label class="form-check-label" for="force_download">Force Download</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label for="caption_separator" class="form-label">Caption Separator:</label>
+                <input type="text" class="form-control" id="caption_separator" name="caption_separator" value=", ">
+            </div>
+            <div class="col-md-6">
+                <label for="tag_replacement" class="form-label">Tag Replacement:</label>
+                <input type="text" class="form-control" id="tag_replacement" name="tag_replacement">
+            </div>
+            <div class="col-md-6">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="character_tag_expand" name="character_tag_expand">
+                    <label class="form-check-label" for="character_tag_expand">Character Tag Expand</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="use_rating_tags" name="use_rating_tags">
+                    <label class="form-check-label" for="use_rating_tags">Use Rating Tags</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="use_rating_tags_as_last_tag" name="use_rating_tags_as_last_tag">
+                    <label class="form-check-label" for="use_rating_tags_as_last_tag">Use Rating Tags as Last Tag</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="remove_underscore" name="remove_underscore" checked>
+                    <label class="form-check-label" for="remove_underscore">Remove Underscore</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label for="thresh" class="form-label">Threshold:</label>
+                <input type="number" class="form-control" id="thresh" name="thresh" value="0.35" step="0.05">
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary">Caption Images</button>
+            </div>
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('browseFolder').addEventListener('click', function() {
+            const input = document.getElementById('train_data_dir');
+            const folder = window.showDirectoryPicker();
+            folder.then(dir => {
+                input.value = 'file:///' + dir.path;
+            }).catch(e => {
+                console.error('User cancelled or error:', e);
+            });
+        });
+
+        document.getElementById('darkModeToggle').addEventListener('change', function() {
+            if (this.checked) {
+                document.body.classList.add('dark-mode');
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            } else {
+                document.body.classList.remove('dark-mode');
+                document.documentElement.setAttribute('data-bs-theme', 'light');
+            }
+        });
+    </script>
+</body>
+</html>
