@@ -66,7 +66,7 @@ def postprocess_output(output):
     # Load tag names from CSV file.
     tag_names = []
     try:
-        with open("./wd14_tagger_model/selected_tags.csv", "r", newline='', encoding='utf-8') as csvfile:
+        with open(TAGS_CSV_PATH, "r", newline='', encoding='utf-8') as csvfile:
             reader = csv.reader(csvfile)
             next(reader, None)  # Skip header row
 
