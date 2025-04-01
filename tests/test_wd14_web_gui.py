@@ -8,7 +8,11 @@ from wd14_web_gui import (
     postprocess_output,
     run_onnx_inference,
     caption_images,
+    app,
 )
+from flask.testing import FlaskClient
+from PIL import Image
+import shutil
 
 
 class TestWd14WebGui(unittest.TestCase):
@@ -36,7 +40,6 @@ class TestWd14WebGui(unittest.TestCase):
         image = np.random.rand(448, 448, 3) * 255
         image = image.astype(np.uint8)
 
-        from PIL import Image
         Image.fromarray(image).save(test_image_path)
 
         result = preprocess_image(test_image_path)
@@ -72,8 +75,7 @@ class TestWd14WebGui(unittest.TestCase):
         test_dir = "test_images"
         os.makedirs(test_dir, exist_ok=True)
         test_image_path = os.path.join(test_dir, "test.jpg")
-        
-        from PIL import Image
+
         Image.new("RGB", (100, 100)).save(test_image_path)
 
         result = caption_images(
@@ -99,15 +101,52 @@ class TestWd14WebGui(unittest.TestCase):
             remove_underscore=False,
             thresh=0.35,
         )
-        
+
         self.assertIn("Captioning process completed", result)
-        
-        import shutil  # Add this import
 
         # Clean up test files
         os.remove(test_image_path)
-        shutil.rmtree(test_dir)  # This removes the directory and all its contents
+        shutil.rmtree(test_dir)
 
+    @patch("wd14_web_gui.run_onnx_inference")
+    def test_caption_images_always_first_tags(self, mock_inference):
+        """Test that always_first_tags is correctly applied when inference returns None."""
+        mock_inference.return_value = None
+        train_data_dir = "test_dir"
+        os.makedirs(train_data_dir, exist_ok=True)
+        img_path = os.path.join(train_data_dir, "test_image.png")
+        Image.new("RGB", (100, 100)).save(img_path)
+
+        result = caption_images(
+            train_data_dir=train_data_dir,
+            caption_extension=".txt",
+            general_threshold=0.5,
+            character_threshold=0.5,
+            repo_id="",
+            recursive=False,
+            max_data_loader_n_workers=1,
+            debug=False,
+            undesired_tags="",
+            frequency_tags="",
+            always_first_tags="first_tag",
+            onnx=True,
+            append_tags=True,
+            force_download=False,
+            caption_separator=", ",
+            tag_replacement="",
+            character_tag_expand=False,
+            use_rating_tags=False,
+            use_rating_tags_as_last_tag=False,
+            remove_underscore=False,
+            thresh=0.5,
+        )
+
+        self.assertEqual(result, "Captioning process completed.")
+        
+        import shutil
+
+        # After the test logic
+        shutil.rmtree(train_data_dir)  # This removes the directory and its contents
 
     @patch("wd14_web_gui.load_onnx_model", return_value=(None, "Error loading model"))
     def test_caption_images_model_failure(self, mock_model):
@@ -136,6 +175,34 @@ class TestWd14WebGui(unittest.TestCase):
             thresh=0.35,
         )
         self.assertIn("Error loading model", result)
+
+    def setUp(self):
+        """Set up a test client for the Flask app."""
+        self.app = app.test_client()
+        self.app.testing = True
+
+    def test_index_route(self):
+        """Test GET request for the index route."""
+        response = self.app.get("/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_index_route_post(self):
+        """Test POST request for the index route with form data."""
+        response = self.app.post("/", data={
+            "train_data_dir": "test_dir",
+            "caption_extension": ".txt",
+            "general_threshold": "0.5",
+            "character_threshold": "0.5",
+            "max_data_loader_n_workers": "1",
+            "undesired_tags": "",
+            "always_first_tags": "first_tag",
+            "caption_separator": ", ",
+            "tag_replacement": "",
+            "thresh": "0.5",
+        })
+        print(response.data)  # Print out response data for debugging
+        self.assertEqual(response.status_code, 200)
+
 
 
 if __name__ == "__main__":

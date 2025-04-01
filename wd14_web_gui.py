@@ -165,33 +165,44 @@ def index():
     error_message = None
     if request.method == "POST":
         repo_id = request.form.get("repo_id", "")
+        train_data_dir = request.form.get("train_data_dir", "")
+        caption_extension = request.form.get("caption_extension", "")
+        general_threshold = request.form.get("general_threshold", "0.5")
+        character_threshold = request.form.get("character_threshold", "0.5")
+        max_data_loader_n_workers = request.form.get("max_data_loader_n_workers", "1")
+        undesired_tags = request.form.get("undesired_tags", "")
+        always_first_tags = request.form.get("always_first_tags", "")
+        caption_separator = request.form.get("caption_separator", ", ")
+        tag_replacement = request.form.get("tag_replacement", "")
+        thresh = request.form.get("thresh", "0.5")
+
         error_message = caption_images(
-            train_data_dir=request.form["train_data_dir"],
-            caption_extension=request.form["caption_extension"],
-            general_threshold=request.form["general_threshold"],
-            character_threshold=request.form["character_threshold"],
+            train_data_dir=train_data_dir,
+            caption_extension=caption_extension,
+            general_threshold=general_threshold,
+            character_threshold=character_threshold,
             repo_id=repo_id,
             recursive=request.form.get("recursive"),
-            max_data_loader_n_workers=request.form["max_data_loader_n_workers"],
+            max_data_loader_n_workers=max_data_loader_n_workers,
             debug=request.form.get("debug"),
-            undesired_tags=request.form["undesired_tags"],
+            undesired_tags=undesired_tags,
             frequency_tags=request.form.get("frequency_tags"),
-            always_first_tags=request.form["always_first_tags"],
+            always_first_tags=always_first_tags,
             onnx=request.form.get("onnx"),
             append_tags=request.form.get("append_tags"),
             force_download=request.form.get("force_download"),
-            caption_separator=request.form["caption_separator"],
-            tag_replacement=request.form["tag_replacement"],
+            caption_separator=caption_separator,
+            tag_replacement=tag_replacement,
             character_tag_expand=request.form.get("character_tag_expand"),
             use_rating_tags=request.form.get("use_rating_tags"),
             use_rating_tags_as_last_tag=request.form.get("use_rating_tags_as_last_tag"),
             remove_underscore=request.form.get("remove_underscore"),
-            thresh=request.form["thresh"],
+            thresh=thresh,
         )
         if error_message is None:
             error_message = "Captioning process completed."
 
-    return render_template("index.html", error_message=error_message, train_data_dir=request.form["train_data_dir"] if request.form.get("train_data_dir") else "")
+    return render_template("index.html", error_message=error_message, train_data_dir=request.form.get("train_data_dir", ""))
 
 if __name__ == "__main__":
     app.run(debug=True)
