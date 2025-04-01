@@ -27,3 +27,49 @@
 - Alternative Padding: Alternatives to black padding include mirroring the image edges or using a blurred version of the image for padding.
 - Model Performance: Padding can sometimes negatively affect model performance, depending on the model. Test with and without padding to see which produces better results for your use case.
 - Cropping instead of padding: Cropping the image to the correct aspect ratio may be a better option than padding, depending on the image content.
+
+# Development Unit Testing
+
+For testing, you need to install `pytest` and `pytest-cov` and `pytest-timeout`.
+
+## Run all tests
+```
+pytest
+```
+
+## Run specific test file
+
+```
+pytest tests/test_wd14_web_gui.py
+```
+
+## Run with coverage report
+
+```
+pytest --cov=glacier_rsync tests/
+```
+
+## Test Information
+
+Mocking:
+- The `onnxruntime.InferenceSession`, `preprocess_image`, and `postprocess_output` functions are mocked to isolate the functions being tested and prevent actual ONNX inference.
+
+Dummy Files:
+- Dummy ONNX model and CSV files are created for testing purposes and cleaned up after each test.
+
+Test Coverage:
+- Tests are included for `load_onnx_model`, `preprocess_image`, `postprocess_output`, `run_onnx_inference`, and `caption_images`.
+The index route is also tested.
+
+Error Handling:
+- Tests are included to ensure that error conditions are handled correctly.
+
+Test for always_first_tags:
+- Added a test to check if only the always_first_tags are correctly written to the caption file, when the onnx model returns no tags.
+
+Pathing:
+- The test now creates and removes a test directory, and test image, to prevent errors.
+
+Flask Testing:
+- Uses the Flask test client to test the web routes.
+
