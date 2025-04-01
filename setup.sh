@@ -7,11 +7,9 @@ TAGS_FILE="selected_tags.csv"
 
 # Define the local directory where the files should be stored
 MODEL_DIR="./wd14_tagger_model/SmilingWolf_wd-v1-4-convnextv2-tagger-v2"
-TAGS_DIR="./wd14_tagger_model"
 
 # Create the directories if they don't exist
 mkdir -p "$MODEL_DIR"
-mkdir -p "$TAGS_DIR"
 
 echo
 echo "Gathering asset files"
@@ -26,12 +24,12 @@ else
 fi
 
 # Check if the tags file already exists
-if [ -f "$TAGS_DIR/$TAGS_FILE" ]; then
+if [ -f "$MODEL_DIR/$TAGS_FILE" ]; then
   echo "Tag list already exists. Skipping download."
 else
   # Download the tags file
   echo "Downloading tag list..."
-  curl -L "https://huggingface.co/$REPO_ID/resolve/main/$TAGS_FILE" -o "$TAGS_DIR/$TAGS_FILE"
+  curl -L "https://huggingface.co/$REPO_ID/resolve/main/$TAGS_FILE" -o "$MODEL_DIR/$TAGS_FILE"
 fi
 
 echo
