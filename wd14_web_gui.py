@@ -1,100 +1,111 @@
-from flask import Flask, render_template, request, jsonify
-import subprocess
+import csv
 import os
+import subprocess
 import logging
+import time
+import numpy as np
+import onnxruntime
+from PIL import Image
+from flask import Flask, render_template, request
+import csv
 
 app = Flask(__name__)
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-# Helper functions (get_executable_path, setup_environment, add_pre_postfix) - same as before
-def get_executable_path(name):
-    paths = [
-        os.path.join(os.getcwd(), name),
-        os.path.join(os.getcwd(), "venv", "Scripts", name),
-        os.path.join(os.getcwd(), "venv", "bin", name),
-        os.path.join(os.getcwd(), "installer_files", "env", "Scripts", name),
-        os.path.join(os.getcwd(), "installer_files", "env", "bin", name),
-        os.path.join(os.getcwd(), "sd-scripts", name),
-        os.path.join(os.getcwd(), "sd-scripts", "venv", "Scripts", name),
-        os.path.join(os.getcwd(), "sd-scripts", "venv", "bin", name),
-    ]
+# ONNX Model Path (Adjust as needed)
+ONNX_MODEL_PATH = "./wd14_tagger_model/wd-v1-4-convnextv2-tagger-v2.onnx"
 
-    for path in paths:
-        if os.path.exists(path):
-            return path
-    raise FileNotFoundError(f"Executable {name} not found.")
+def load_onnx_model():
+    """Loads the ONNX model."""
+    try:
+        sess = onnxruntime.InferenceSession(ONNX_MODEL_PATH)
+        return sess
+    except Exception as e:
+        log.error(f"Error loading ONNX model: {e}")
+        return None
 
-def setup_environment():
-    env = os.environ.copy()
-    venv_dir = os.path.join(os.getcwd(), "venv")
-    sd_scripts_venv_dir = os.path.join(os.getcwd(), "sd-scripts", "venv")
-    installer_venv_dir = os.path.join(os.getcwd(), "installer_files", "env")
+def preprocess_image(image_path):
+    """Preprocesses the image for ONNX inference, maintaining aspect ratio."""
+    try:
+        image = Image.open(image_path).convert("RGB")
+        width, height = image.size
 
-    if os.path.exists(venv_dir):
-        env["PATH"] = os.path.join(venv_dir, "Scripts") + os.pathsep + env["PATH"]
-    elif os.path.exists(sd_scripts_venv_dir):
-        env["PATH"] = os.path.join(sd_scripts_venv_dir, "Scripts") + os.pathsep + env["PATH"]
-    elif os.path.exists(installer_venv_dir):
-      env["PATH"] = os.path.join(installer_venv_dir, "Scripts") + os.pathsep + env["PATH"]
+        if width > height:
+            new_width = 448
+            new_height = int(height * (448 / width))
+        else:
+            new_height = 448
+            new_width = int(width * (448 / height))
 
-    return env
+        image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
-def add_pre_postfix(folder, caption_file_ext, prefix, recursive):
-    if not os.path.exists(folder):
-        log.error(f"Folder {folder} does not exist.")
+        padded_image = Image.new("RGB", (448, 448))
+        padded_image.paste(image, ((448 - new_width) // 2, (448 - new_height) // 2))
+
+        image = np.array(padded_image).astype(np.float32) / 255.0
+        image = np.transpose(image, (0, 1, 2))
+        image = np.expand_dims(image, axis=0)
+        return image
+    except Exception as e:
+        log.error(f"Error preprocessing image: {e}")
+        return None
+
+
+def postprocess_output(output):
+    """Extracts tags and scores from the ONNX model's output."""
+    tags = []
+    threshold = 0.35  # Adjust as needed
+
+    # Load tag names from CSV file.
+    tag_names = []
+    try:
+        with open("./wd14_tagger_model/selected_tags.csv", "r", newline='', encoding='utf-8') as csvfile:
+            reader = csv.reader(csvfile)
+            next(reader, None)  # Skip header row
+
+            for row in reader:
+                tag_names.append(row[1]) #Extract the tag from the second column.
+
+    except FileNotFoundError:
+        log.error("CSV tag file not found.")
+        return ""
+
+    for i, score in enumerate(output[0]):
+        if score > threshold:
+            tags.append(tag_names[i])
+
+    tags = [tag.strip() for tag in tags if tag.strip()] #Remove empty tags.
+
+    return ", ".join(tags)
+
+
+def run_onnx_inference(sess, image_path):
+    """Runs ONNX inference and extracts tags."""
+    try:
+        image = preprocess_image(image_path)
+        if image is None:
+            return None
+
+        input_name = sess.get_inputs()[0].name
+        output_name = sess.get_outputs()[0].name
+        output = sess.run([output_name], {input_name: image})[0]
+
+        print(f"Output Name: {output_name}")
+        print(f"Output Shape: {output.shape}")
+
+        tags = postprocess_output(output)
+        return tags
+    except Exception as e:
+        log.error(f"Error running ONNX inference: {e}")
+        return None
+
+def caption_images(train_data_dir, caption_extension, general_threshold, character_threshold, repo_id, recursive, max_data_loader_n_workers, debug, undesired_tags, frequency_tags, always_first_tags, onnx, append_tags, force_download, caption_separator, tag_replacement, character_tag_expand, use_rating_tags, use_rating_tags_as_last_tag, remove_underscore, thresh):
+    """Captions images using ONNX Runtime."""
+    onnx_sess = load_onnx_model()
+    if onnx_sess is None:
         return
 
-    def process_file(file_path):
-        if file_path.lower().endswith(caption_file_ext):
-            try:
-                with open(file_path, "r") as f:
-                    content = f.read().strip()
-                if prefix and not content.startswith(prefix.strip()):
-                    if content:
-                        new_content = f"{prefix.strip()}, {content}"
-                    else:
-                        new_content = prefix.strip()
-                    with open(file_path, "w") as f:
-                        f.write(new_content)
-                log.info(f"Processed {file_path}")
-            except Exception as e:
-                log.error(f"Error processing {file_path}: {e}")
-
-    if recursive:
-        for root, _, files in os.walk(folder):
-            for file in files:
-                process_file(os.path.join(root, file))
-    else:
-        for file in os.listdir(folder):
-            process_file(os.path.join(folder, file))
-
-def caption_images(
-    train_data_dir,
-    caption_extension,
-    batch_size,
-    general_threshold,
-    character_threshold,
-    repo_id,
-    recursive,
-    max_data_loader_n_workers,
-    debug,
-    undesired_tags,
-    frequency_tags,
-    always_first_tags,
-    onnx,
-    append_tags,
-    force_download,
-    caption_separator,
-    tag_replacement,
-    character_tag_expand,
-    use_rating_tags,
-    use_rating_tags_as_last_tag,
-    remove_underscore,
-    thresh,
-):
     if not train_data_dir:
         log.error("Image folder is missing...")
         return
@@ -103,135 +114,63 @@ def caption_images(
         log.error("Please provide an extension for the caption files.")
         return
 
-    repo_id_converted = repo_id.replace("/", "_")
-    if not os.path.exists(f"./wd14_tagger_model/{repo_id_converted}"):
-        force_download = True
-
     log.info(f"Captioning files in {train_data_dir}...")
-    run_cmd = [
-        rf'{get_executable_path("accelerate")}',
-        "launch",
-        rf"{os.path.join(os.getcwd(), 'sd-scripts/finetune/tag_images_by_wd14_tagger.py')}",
-    ]
 
-    if append_tags:
-        run_cmd.append("--append_tags")
-    run_cmd.append("--batch_size")
-    run_cmd.append(str(int(batch_size)))
-    run_cmd.append("--caption_extension")
-    run_cmd.append(caption_extension)
-    run_cmd.append("--caption_separator")
-    run_cmd.append(caption_separator)
+    for root, _, files in os.walk(train_data_dir):
+        for file in files:
+            if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                image_path = os.path.join(root, file)
+                tags = run_onnx_inference(onnx_sess, image_path)
 
-    if character_tag_expand:
-        run_cmd.append("--character_tag_expand")
-    if character_threshold != 0.35:
-        run_cmd.append("--character_threshold")
-        run_cmd.append(str(character_threshold))
-    if debug:
-        run_cmd.append("--debug")
-    if force_download:
-        run_cmd.append("--force_download")
-    if frequency_tags:
-        run_cmd.append("--frequency_tags")
-    if general_threshold != 0.35:
-        run_cmd.append("--general_threshold")
-        run_cmd.append(str(general_threshold))
-    run_cmd.append("--max_data_loader_n_workers")
-    run_cmd.append(str(int(max_data_loader_n_workers)))
+                if tags and tags.strip(): #check if tags is not empty.
+                    caption_file = os.path.splitext(image_path)[0] + caption_extension
+                    if always_first_tags:
+                        prefix_tags = [tag.strip() for tag in always_first_tags.split(",") if tag.strip()]
+                        with open(caption_file, "w") as f:
+                            f.write(", ".join(prefix_tags) + ", " + tags)
+                    else:
+                        with open(caption_file, "w") as f:
+                            f.write(tags)
+                    log.info(f"Captioned: {image_path}")
+                elif always_first_tags: #If there are no tags, but there are always first tags, write those.
+                    caption_file = os.path.splitext(image_path)[0] + caption_extension
+                    prefix_tags = [tag.strip() for tag in always_first_tags.split(",") if tag.strip()]
+                    with open(caption_file, "w") as f:
+                        f.write(", ".join(prefix_tags))
+                    log.info(f"Captioned: {image_path}")
 
-    if onnx:
-        run_cmd.append("--onnx")
-    if recursive:
-        run_cmd.append("--recursive")
-    if remove_underscore:
-        run_cmd.append("--remove_underscore")
-    run_cmd.append("--repo_id")
-    run_cmd.append(repo_id)
-    if tag_replacement:
-        run_cmd.append("--tag_replacement")
-        run_cmd.append(tag_replacement)
-    if thresh != 0.35:
-        run_cmd.append("--thresh")
-        run_cmd.append(str(thresh))
-    if undesired_tags:
-        run_cmd.append("--undesired_tags")
-        run_cmd.append(undesired_tags)
-    if use_rating_tags:
-        run_cmd.append("--use_rating_tags")
-    if use_rating_tags_as_last_tag:
-        run_cmd.append("--use_rating_tags_as_last_tag")
+        if not recursive:
+            break
 
-    run_cmd.append(rf"{train_data_dir}")
-
-    env = setup_environment()
-
-    command_to_run = " ".join(run_cmd)
-    log.info(f"Executing command: {command_to_run}")
-
-    subprocess.run(run_cmd, env=env)
-
-    add_pre_postfix(
-        folder=train_data_dir,
-        caption_file_ext=caption_extension,
-        prefix=always_first_tags,
-        recursive=recursive,
-    )
-
-@app.route('/', methods=['GET', 'POST'])
+@app.route("/", methods=["GET", "POST"])
 def index():
-    if request.method == 'POST':
-        train_data_dir = request.form['train_data_dir']
-        caption_extension = request.form['caption_extension']
-        batch_size = int(request.form['batch_size'])
-        general_threshold = float(request.form['general_threshold'])
-        character_threshold = float(request.form['character_threshold'])
-        repo_id = request.form['repo_id']
-        recursive = 'recursive' in request.form
-        max_data_loader_n_workers = int(request.form['max_data_loader_n_workers'])
-        debug = 'debug' in request.form
-        undesired_tags = request.form['undesired_tags']
-        frequency_tags = 'frequency_tags' in request.form
-        always_first_tags = request.form['always_first_tags']
-        onnx = 'onnx' in request.form
-        append_tags = 'append_tags' in request.form
-        force_download = 'force_download' in request.form
-        caption_separator = request.form['caption_separator']
-        tag_replacement = request.form['tag_replacement']
-        character_tag_expand = 'character_tag_expand' in request.form
-        use_rating_tags = 'use_rating_tags' in request.form
-        use_rating_tags_as_last_tag = 'use_rating_tags_as_last_tag' in request.form
-        remove_underscore = 'remove_underscore' in request.form
-        thresh = float(request.form['thresh'])
-
+    """Handles the main web interface."""
+    if request.method == "POST":
         caption_images(
-            train_data_dir,
-            caption_extension,
-            batch_size,
-            general_threshold,
-            character_threshold,
-            repo_id,
-            recursive,
-            max_data_loader_n_workers,
-            debug,
-            undesired_tags,
-            frequency_tags,
-            always_first_tags,
-            onnx,
-            append_tags,
-            force_download,
-            caption_separator,
-            tag_replacement,
-            character_tag_expand,
-            use_rating_tags,
-            use_rating_tags_as_last_tag,
-            remove_underscore,
-            thresh,
+            train_data_dir=request.form["train_data_dir"],
+            caption_extension=request.form["caption_extension"],
+            general_threshold=request.form["general_threshold"],
+            character_threshold=request.form["character_threshold"],
+            repo_id=request.form["repo_id"],
+            recursive=request.form.get("recursive"),
+            max_data_loader_n_workers=request.form["max_data_loader_n_workers"],
+            debug=request.form.get("debug"),
+            undesired_tags=request.form["undesired_tags"],
+            frequency_tags=request.form.get("frequency_tags"),
+            always_first_tags=request.form["always_first_tags"],
+            onnx=request.form.get("onnx"),
+            append_tags=request.form.get("append_tags"),
+            force_download=request.form.get("force_download"),
+            caption_separator=request.form["caption_separator"],
+            tag_replacement=request.form["tag_replacement"],
+            character_tag_expand=request.form.get("character_tag_expand"),
+            use_rating_tags=request.form.get("use_rating_tags"),
+            use_rating_tags_as_last_tag=request.form.get("use_rating_tags_as_last_tag"),
+            remove_underscore=request.form.get("remove_underscore"),
+            thresh=request.form["thresh"],
         )
+        return "Captioning process started."
+    return render_template("index.html")
 
-        return jsonify({'message': 'Captioning completed'})
-
-    return render_template('index.html')
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
