@@ -186,8 +186,14 @@
             statusMessage.innerHTML = '<div class="alert alert-info" role="alert">Captioning in progress...</div>';
         });
 
-        browseFolder.addEventListener('click', function() {
-            trainDataDir.value = window.showDirectoryPicker();
+        browseFolder.addEventListener('click', async function() {
+            try {
+                const directoryHandle = await window.showDirectoryPicker();
+                trainDataDir.value = directoryHandle.name; //just the name. If full path is needed, more work is required.
+            } catch (err) {
+                // User likely canceled the selection.
+                console.error(err);
+            }
         });
 
         clearFolder.addEventListener('click', function() {

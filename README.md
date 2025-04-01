@@ -15,7 +15,7 @@ This downloads the ONNX model, the selected tags file (the same resources as Koh
 In a command console, run:
 
 ```
-sh setup.sh
+bash setup.sh
 ```
 
 Once the setup is complete, move to the Run section.
@@ -25,7 +25,7 @@ Once the setup is complete, move to the Run section.
 To start the backend of the program, in a command console, run:
 
 ```
-python start.py
+bash start.sh
 ```
 
 This will launch the backend of the program in a console, running the program for your browser to load locally. 
