@@ -135,3 +135,6 @@ TEST*.xml
 
 # Windows OS crap
 Thumbs.db
+
+# Downloaded assets folder
+wd14_tagger_model/

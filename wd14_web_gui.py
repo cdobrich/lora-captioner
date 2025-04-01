@@ -1,4 +1,3 @@
-import csv
 import os
 import subprocess
 import logging
@@ -13,17 +12,25 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-# ONNX Model Path (Adjust as needed)
-ONNX_MODEL_PATH = "./wd14_tagger_model/wd-v1-4-convnextv2-tagger-v2.onnx"
+ONNX_MODEL_PATH = "./wd14_tagger_model/SmilingWolf_wd-v1-4-convnextv2-tagger-v2/model.onnx"
+TAGS_CSV_PATH = "./wd14_tagger_model/SmilingWolf_wd-v1-4-convnextv2-tagger-v2/selected_tags.csv"
 
 def load_onnx_model():
     """Loads the ONNX model."""
+    if not os.path.exists(ONNX_MODEL_PATH) or not os.path.exists(TAGS_CSV_PATH):
+        error_message = "Error: ONNX model or tag file not found. Please run ./setup.sh to download the necessary files."
+        log.error(error_message)
+        return None, error_message # Return None for the model, and the error message
+
     try:
         sess = onnxruntime.InferenceSession(ONNX_MODEL_PATH)
-        return sess
+        return sess, None # Return the model and no error message
     except Exception as e:
-        log.error(f"Error loading ONNX model: {e}")
-        return None
+        error_message = f"Error loading ONNX model: {e}"
+        log.error(error_message)
+        return None, error_message # Return None for the model, and the error message
+
+
 
 def preprocess_image(image_path):
     """Preprocesses the image for ONNX inference, maintaining aspect ratio."""
@@ -50,7 +57,6 @@ def preprocess_image(image_path):
     except Exception as e:
         log.error(f"Error preprocessing image: {e}")
         return None
-
 
 def postprocess_output(output):
     """Extracts tags and scores from the ONNX model's output."""
@@ -79,7 +85,6 @@ def postprocess_output(output):
 
     return ", ".join(tags)
 
-
 def run_onnx_inference(sess, image_path):
     """Runs ONNX inference and extracts tags."""
     try:
@@ -100,58 +105,76 @@ def run_onnx_inference(sess, image_path):
         log.error(f"Error running ONNX inference: {e}")
         return None
 
+
 def caption_images(train_data_dir, caption_extension, general_threshold, character_threshold, repo_id, recursive, max_data_loader_n_workers, debug, undesired_tags, frequency_tags, always_first_tags, onnx, append_tags, force_download, caption_separator, tag_replacement, character_tag_expand, use_rating_tags, use_rating_tags_as_last_tag, remove_underscore, thresh):
     """Captions images using ONNX Runtime."""
-    onnx_sess = load_onnx_model()
+    onnx_sess, onnx_error = load_onnx_model()
     if onnx_sess is None:
-        return
+        return onnx_error # Return the error message from loading the onnx model.
 
     if not train_data_dir:
-        log.error("Image folder is missing...")
-        return
+        return "Error: Image folder is missing."
 
     if not caption_extension:
-        log.error("Please provide an extension for the caption files.")
-        return
+        return "Error: Please provide an extension for the caption files."
 
-    log.info(f"Captioning files in {train_data_dir}...")
+    if not os.path.exists(train_data_dir):
+        return f"Error: Directory '{train_data_dir}' does not exist."
 
+    image_files = []
     for root, _, files in os.walk(train_data_dir):
         for file in files:
             if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                image_path = os.path.join(root, file)
-                tags = run_onnx_inference(onnx_sess, image_path)
-
-                if tags and tags.strip(): #check if tags is not empty.
-                    caption_file = os.path.splitext(image_path)[0] + caption_extension
-                    if always_first_tags:
-                        prefix_tags = [tag.strip() for tag in always_first_tags.split(",") if tag.strip()]
-                        with open(caption_file, "w") as f:
-                            f.write(", ".join(prefix_tags) + ", " + tags)
-                    else:
-                        with open(caption_file, "w") as f:
-                            f.write(tags)
-                    log.info(f"Captioned: {image_path}")
-                elif always_first_tags: #If there are no tags, but there are always first tags, write those.
-                    caption_file = os.path.splitext(image_path)[0] + caption_extension
-                    prefix_tags = [tag.strip() for tag in always_first_tags.split(",") if tag.strip()]
-                    with open(caption_file, "w") as f:
-                        f.write(", ".join(prefix_tags))
-                    log.info(f"Captioned: {image_path}")
-
+                image_files.append(os.path.join(root, file))
         if not recursive:
             break
+
+    if not image_files:
+        return f"Error: No images found in '{train_data_dir}'."
+
+    log.info(f"Captioning files in {train_data_dir}...")
+
+    for image_path in image_files:
+        tags = run_onnx_inference(onnx_sess, image_path)
+
+        if tags and tags.strip():
+            caption_file = os.path.splitext(image_path)[0] + caption_extension
+            try:
+                if always_first_tags:
+                    prefix_tags = [tag.strip() for tag in always_first_tags.split(",") if tag.strip()]
+                    with open(caption_file, "w") as f:
+                        f.write(", ".join(prefix_tags) + ", " + tags)
+                else:
+                    with open(caption_file, "w") as f:
+                        f.write(tags)
+                log.info(f"Captioned: {image_path}")
+            except PermissionError:
+                return f"Error: Permission denied writing to '{caption_file}'."
+
+        elif always_first_tags:
+            caption_file = os.path.splitext(image_path)[0] + caption_extension
+            try:
+                prefix_tags = [tag.strip() for tag in always_first_tags.split(",") if tag.strip()]
+                with open(caption_file, "w") as f:
+                    f.write(", ".join(prefix_tags))
+                log.info(f"Captioned: {image_path}")
+            except PermissionError:
+                return f"Error: Permission denied writing to '{caption_file}'."
+
+    return "Captioning process completed."
 
 @app.route("/", methods=["GET", "POST"])
 def index():
     """Handles the main web interface."""
+    error_message = None
     if request.method == "POST":
-        caption_images(
+        repo_id = request.form.get("repo_id", "")  # Get repo_id, default to empty string if missing.
+        error_message = caption_images(
             train_data_dir=request.form["train_data_dir"],
             caption_extension=request.form["caption_extension"],
             general_threshold=request.form["general_threshold"],
             character_threshold=request.form["character_threshold"],
-            repo_id=request.form["repo_id"],
+            repo_id=repo_id, #Use the now correctly defined repo_id variable.
             recursive=request.form.get("recursive"),
             max_data_loader_n_workers=request.form["max_data_loader_n_workers"],
             debug=request.form.get("debug"),
@@ -169,8 +192,7 @@ def index():
             remove_underscore=request.form.get("remove_underscore"),
             thresh=request.form["thresh"],
         )
-        return "Captioning process started."
-    return render_template("index.html")
+    return render_template("index.html", error_message=error_message)
 
 if __name__ == "__main__":
     app.run(debug=True)
