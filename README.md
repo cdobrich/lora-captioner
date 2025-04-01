@@ -1,6 +1,46 @@
-# lora-captioner
+# LoRA-Captioner for Non-Nvidia GPUs.
 
-# Image Preprocessing Info and Explanation
+This is an image tagging tool for Stable Diffusion LoRAs for use on non-Nvidia GPUs. In theory it should even work on just a pure CPU. It was inspired by the [kohya_ss](https://github.com/bmaltais/kohya_ss) project. It uses the same resources, so this is like using the WD14 captioning tool.
+
+(I have tested this on my Thinkpad T480 with Intel HD Graphics 620.)
+
+I think I implemented all the currently available GUI features but I might have missed some.
+
+# Installation Setup
+
+This is designed to run on Linux, but in theory nothing is stopping you from running on Windows or MacOS. All you need is Python 3 installed, and CURL.
+
+This downloads the ONNX model, the selected tags file (the same resources as Kohya_ss), and installs the captioner program python dependencies.
+
+In a command console, run:
+
+```
+sh setup.sh
+```
+
+Once the setup is complete, move to the Run section.
+
+# Usage / Running
+
+To start the backend of the program, in a command console, run:
+
+```
+python start.py
+```
+
+This will launch the backend of the program in a console, running the program for your browser to load locally. 
+
+Open this address URL in your browser of choice:
+
+http://127.0.0.1:5000/
+
+# Stopping the Program
+
+To stop the program, press CTRL+C in the console window or just close the terminal console. You can close the browser tab also.
+
+# Extra Info - Image Preprocessing Info and Explanation
+
+Extra details being recorded in case they are ever needed in the future.
 
 ## Aspect Ratio Calculation:
 - We get the original width and height of the image.

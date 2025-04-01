@@ -21,4 +21,13 @@ curl -L "https://huggingface.co/$REPO_ID/resolve/main/$MODEL_FILE" -o "$MODEL_DI
 echo "Downloading tag list..."
 curl -L "https://huggingface.co/$REPO_ID/resolve/main/$TAGS_FILE" -o "$TAGS_DIR/$TAGS_FILE"
 
+# Create and activate a Python virtual environment
+echo "Creating and activating virtual environment..."
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies from requirements.txt
+echo "Installing dependencies..."
+pip install -r requirements.txt
+
 echo "Setup complete!"
