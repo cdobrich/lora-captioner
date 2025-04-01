@@ -53,9 +53,12 @@ class TestWd14WebGui(unittest.TestCase):
         result = preprocess_image("non_existent.jpg")
         self.assertIsNone(result)
 
-    def test_postprocess_output_valid(self):
-        """Test postprocessing with valid output data."""
+    @patch("os.path.exists", return_value=True)
+    @patch("wd14_web_gui.open", new_callable=unittest.mock.mock_open, read_data="index,tag\n0,cat\n1,dog\n2,flower\n3,sky")
+    def test_postprocess_output_valid(self, mock_open, mock_exists):
         output = np.array([[0.4, 0.2, 0.5, 0.1]])
+        tags = postprocess_output(output)
+        self.assertIn("cat", tags)
         with patch("wd14_web_gui.open", unittest.mock.mock_open(read_data="index,tag\n0,cat\n1,dog\n2,flower\n3,sky")):
             tags = postprocess_output(output)
         self.assertIn("cat", tags)
@@ -108,9 +111,9 @@ class TestWd14WebGui(unittest.TestCase):
         os.remove(test_image_path)
         shutil.rmtree(test_dir)
 
+    @patch("wd14_web_gui.load_onnx_model", return_value=(MagicMock(), None))
     @patch("wd14_web_gui.run_onnx_inference")
-    def test_caption_images_always_first_tags(self, mock_inference):
-        """Test that always_first_tags is correctly applied when inference returns None."""
+    def test_caption_images_always_first_tags(self, mock_inference, mock_load_model):
         mock_inference.return_value = None
         train_data_dir = "test_dir"
         os.makedirs(train_data_dir, exist_ok=True)
