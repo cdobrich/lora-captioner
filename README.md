@@ -86,7 +86,7 @@ pytest tests/test_wd14_web_gui.py
 ## Run with coverage report
 
 ```
-pytest --cov=glacier_rsync tests/
+pytest --cov=wd14_web_gui tests/
 ```
 
 ## Test Information
