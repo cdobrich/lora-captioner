@@ -1,7 +1,5 @@
 import os
-import subprocess
 import logging
-import time
 import numpy as np
 import onnxruntime
 from PIL import Image
@@ -20,17 +18,15 @@ def load_onnx_model():
     if not os.path.exists(ONNX_MODEL_PATH) or not os.path.exists(TAGS_CSV_PATH):
         error_message = "Error: ONNX model or tag file not found. Please run ./setup.sh to download the necessary files."
         log.error(error_message)
-        return None, error_message # Return None for the model, and the error message
+        return None, error_message
 
     try:
         sess = onnxruntime.InferenceSession(ONNX_MODEL_PATH)
-        return sess, None # Return the model and no error message
+        return sess, None
     except Exception as e:
         error_message = f"Error loading ONNX model: {e}"
         log.error(error_message)
-        return None, error_message # Return None for the model, and the error message
-
-
+        return None, error_message
 
 def preprocess_image(image_path):
     """Preprocesses the image for ONNX inference, maintaining aspect ratio."""
@@ -61,27 +57,33 @@ def preprocess_image(image_path):
 def postprocess_output(output):
     """Extracts tags and scores from the ONNX model's output."""
     tags = []
-    threshold = 0.35  # Adjust as needed
+    threshold = 0.35
 
-    # Load tag names from CSV file.
     tag_names = []
     try:
+        if not os.path.exists(TAGS_CSV_PATH):
+            log.error(f"CSV tag file not found at: {TAGS_CSV_PATH}")
+            return None
+
         with open(TAGS_CSV_PATH, "r", newline='', encoding='utf-8') as csvfile:
             reader = csv.reader(csvfile)
-            next(reader, None)  # Skip header row
+            next(reader, None)
 
             for row in reader:
-                tag_names.append(row[1]) #Extract the tag from the second column.
+                tag_names.append(row[1])
 
     except FileNotFoundError:
         log.error("CSV tag file not found.")
-        return ""
+        return None
+    except Exception as e:
+        log.error(f"Error reading CSV file: {e}")
+        return None
 
     for i, score in enumerate(output[0]):
         if score > threshold:
             tags.append(tag_names[i])
 
-    tags = [tag.strip() for tag in tags if tag.strip()] #Remove empty tags.
+    tags = [tag.strip() for tag in tags if tag.strip()]
 
     return ", ".join(tags)
 
@@ -96,21 +98,17 @@ def run_onnx_inference(sess, image_path):
         output_name = sess.get_outputs()[0].name
         output = sess.run([output_name], {input_name: image})[0]
 
-        print(f"Output Name: {output_name}")
-        print(f"Output Shape: {output.shape}")
-
         tags = postprocess_output(output)
         return tags
     except Exception as e:
         log.error(f"Error running ONNX inference: {e}")
         return None
 
-
 def caption_images(train_data_dir, caption_extension, general_threshold, character_threshold, repo_id, recursive, max_data_loader_n_workers, debug, undesired_tags, frequency_tags, always_first_tags, onnx, append_tags, force_download, caption_separator, tag_replacement, character_tag_expand, use_rating_tags, use_rating_tags_as_last_tag, remove_underscore, thresh):
     """Captions images using ONNX Runtime."""
     onnx_sess, onnx_error = load_onnx_model()
     if onnx_sess is None:
-        return onnx_error # Return the error message from loading the onnx model.
+        return onnx_error
 
     if not train_data_dir:
         return "Error: Image folder is missing."
@@ -137,20 +135,18 @@ def caption_images(train_data_dir, caption_extension, general_threshold, charact
     for image_path in image_files:
         tags = run_onnx_inference(onnx_sess, image_path)
 
-        if tags and tags.strip():
+        if tags:
             caption_file = os.path.splitext(image_path)[0] + caption_extension
             try:
-                if always_first_tags:
-                    prefix_tags = [tag.strip() for tag in always_first_tags.split(",") if tag.strip()]
-                    with open(caption_file, "w") as f:
-                        f.write(", ".join(prefix_tags) + ", " + tags)
-                else:
-                    with open(caption_file, "w") as f:
+                with open(caption_file, "w") as f:
+                    if always_first_tags:
+                        prefix_tags = [tag.strip() for tag in always_first_tags.split(",") if tag.strip()]
+                        f.write(", ".join(prefix_tags) + (", " + tags if tags.strip() else ""))
+                    else:
                         f.write(tags)
                 log.info(f"Captioned: {image_path}")
             except PermissionError:
                 return f"Error: Permission denied writing to '{caption_file}'."
-
         elif always_first_tags:
             caption_file = os.path.splitext(image_path)[0] + caption_extension
             try:
@@ -168,13 +164,13 @@ def index():
     """Handles the main web interface."""
     error_message = None
     if request.method == "POST":
-        repo_id = request.form.get("repo_id", "")  # Get repo_id, default to empty string if missing.
+        repo_id = request.form.get("repo_id", "")
         error_message = caption_images(
             train_data_dir=request.form["train_data_dir"],
             caption_extension=request.form["caption_extension"],
             general_threshold=request.form["general_threshold"],
             character_threshold=request.form["character_threshold"],
-            repo_id=repo_id, #Use the now correctly defined repo_id variable.
+            repo_id=repo_id,
             recursive=request.form.get("recursive"),
             max_data_loader_n_workers=request.form["max_data_loader_n_workers"],
             debug=request.form.get("debug"),
@@ -192,7 +188,10 @@ def index():
             remove_underscore=request.form.get("remove_underscore"),
             thresh=request.form["thresh"],
         )
-    return render_template("index.html", error_message=error_message)
+        if error_message is None:
+            error_message = "Captioning process completed."
+
+    return render_template("index.html", error_message=error_message, train_data_dir=request.form["train_data_dir"] if request.form.get("train_data_dir") else "")
 
 if __name__ == "__main__":
     app.run(debug=True)
