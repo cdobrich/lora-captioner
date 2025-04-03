@@ -42,16 +42,17 @@ def preprocess_image(image_path):
 
         image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
-        padded_image = Image.new("RGB", (448, 448), (0, 0, 0)) #Black padding
+        padded_image = Image.new("RGB", (448, 448), (0, 0, 0)) # Black padding
         padded_image.paste(image, ((448 - new_width) // 2, (448 - new_height) // 2))
 
         image = np.array(padded_image).astype(np.float32) / 255.0
-        image = np.transpose(image, (2, 0, 1))
-        image = np.expand_dims(image, axis=0)
+        # No transpose needed because we want (H, W, C)
+        image = np.expand_dims(image, axis=0) # Add batch dimension (N, H, W, C)
         return image
     except Exception as e:
         log.error(f"Error preprocessing image: {e}")
         return None
+    
 
 def postprocess_output(output, general_threshold, character_threshold):
     """Extracts tags and scores from the ONNX model's output, using different thresholds."""
@@ -71,19 +72,21 @@ def postprocess_output(output, general_threshold, character_threshold):
         log.error(f"Error reading CSV file: {e}")
         return None
 
-    for i, score in enumerate(output[0]):
+    print(f"Output shape: {np.array(output).shape}")
+    print(f"Output: {output}")
+
+    for i, score_array in enumerate(output[0][0]): #Corrected line!
         tag_name = tag_names[i]
         if tag_name in CHARACTER_TAGS:
             threshold = float(character_threshold)
         else:
             threshold = float(general_threshold)
 
-        if score > threshold:
+        if score_array > threshold: #Corrected line!
             tags.append(tag_name)
 
     tags = [tag.strip() for tag in tags if tag.strip()]
     return ", ".join(tags)
-
 
 def run_onnx_inference(sess, image_path, general_threshold, character_threshold):
     """Runs ONNX inference and extracts tags."""
