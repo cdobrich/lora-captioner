@@ -10,18 +10,54 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-ONNX_MODEL_PATH = "./wd14_tagger_model/SmilingWolf_wd-v1-4-convnextv2-tagger-v2/model.onnx"
-TAGS_CSV_PATH = "./wd14_tagger_model/SmilingWolf_wd-v1-4-convnextv2-tagger-v2/selected_tags.csv"
+MODEL_DIR = "./wd14_tagger_model/"
+RECORD_FILE = os.path.join(MODEL_DIR, "model_choice.txt")
 
 # List of character tags (modify as needed)
 CHARACTER_TAGS = [
     "1girl", "1boy", "2girls", "2boys", #Add more character tags here.
 ]
 
+def load_model_paths():
+    """Loads the model and tags paths based on the user's choice."""
+    try:
+        with open(RECORD_FILE, "r", encoding="utf-8") as f:
+            repo_id = f.read().strip()
+            log.info(f"Read repo_id from model_choice.txt: {repo_id}") #added log
+            model_dir = os.path.join(MODEL_DIR, repo_id.replace("/", "_"))
+            model_path = os.path.join(model_dir, "model.onnx")
+            tags_path = os.path.join(model_dir, "selected_tags.csv")
+
+            if not os.path.exists(model_path) or not os.path.exists(tags_path):
+                raise FileNotFoundError(f"Model or tags file not found at: {model_path} or {tags_path}")
+
+            return model_path, tags_path, None
+    except FileNotFoundError as e:
+        log.error(f"Model choice record file or model files not found: {e}. Using default model.")
+        default_repo_id = "SmilingWolf/wd-v1-4-convnextv2-tagger-v2"
+        default_model_dir = os.path.join(MODEL_DIR, default_repo_id.replace("/", "_"))
+        default_model_path = os.path.join(default_model_dir, "model.onnx")
+        default_tags_path = os.path.join(default_model_dir, "selected_tags.csv")
+
+        if not os.path.exists(default_model_path) or not os.path.exists(default_tags_path):
+            return None, None, "Default model files not found."
+
+        return default_model_path, default_tags_path, None
+
+    except Exception as e:
+        log.error(f"Error loading model paths: {e}")
+        return None, None, str(e)
+    
+    
+
 def load_onnx_model():
     """Loads the ONNX model for inference."""
+    model_path, _, error = load_model_paths()
+    if error:
+        return None, error
+
     try:
-        sess = onnxruntime.InferenceSession(ONNX_MODEL_PATH)
+        sess = onnxruntime.InferenceSession(model_path)
         return sess, None
     except Exception as e:
         log.error(f"Error loading ONNX model: {e}")
@@ -46,21 +82,22 @@ def preprocess_image(image_path):
         padded_image.paste(image, ((448 - new_width) // 2, (448 - new_height) // 2))
 
         image = np.array(padded_image).astype(np.float32) / 255.0
-        # No transpose needed because we want (H, W, C)
         image = np.expand_dims(image, axis=0) # Add batch dimension (N, H, W, C)
         return image
     except Exception as e:
         log.error(f"Error preprocessing image: {e}")
         return None
-    
 
 def postprocess_output(output, general_threshold, character_threshold):
     """Extracts tags and scores from the ONNX model's output, using different thresholds."""
     tags = []
     tag_names = []
+    _, tags_path, error = load_model_paths()
+    if error:
+        return None
 
     try:
-        with open(TAGS_CSV_PATH, "r", encoding="utf-8") as f:
+        with open(tags_path, "r", encoding="utf-8") as f:
             reader = csv.reader(f)
             next(reader)  # Skip header
             tag_names = [row[1] for row in reader]
@@ -75,14 +112,14 @@ def postprocess_output(output, general_threshold, character_threshold):
     print(f"Output shape: {np.array(output).shape}")
     print(f"Output: {output}")
 
-    for i, score_array in enumerate(output[0][0]): #Corrected line!
+    for i, score_array in enumerate(output[0][0]):
         tag_name = tag_names[i]
         if tag_name in CHARACTER_TAGS:
             threshold = float(character_threshold)
         else:
             threshold = float(general_threshold)
 
-        if score_array > threshold: #Corrected line!
+        if score_array > threshold:
             tags.append(tag_name)
 
     tags = [tag.strip() for tag in tags if tag.strip()]
@@ -130,10 +167,20 @@ def caption_images(train_data_dir, caption_extension, repo_id, recursive, max_da
 
     return "Captioning process completed."
 
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     """Handles the main web interface."""
     error_message = None
+    selected_repo = None
+    try:
+        with open(RECORD_FILE, "r", encoding="utf-8") as f:
+            selected_repo = f.read().strip()
+            log.info(f"Read repo_id from model_choice.txt for display: {selected_repo}") #added log
+    except Exception as e:
+        log.error(f"Error reading model_choice.txt: {e}")
+        pass
+    
     if request.method == "POST":
         train_data_dir = request.form.get("train_data_dir", "")
         caption_extension = request.form.get("caption_extension", ".txt")
@@ -174,7 +221,8 @@ def index():
         if error_message is None:
             error_message = "Captioning process completed."
 
-    return render_template("index.html", error_message=error_message, train_data_dir=request.form.get("train_data_dir", ""))
+    return render_template("index.html", error_message=error_message, train_data_dir=request.form.get("train_data_dir", ""), selected_repo=selected_repo)
+
 
 if __name__ == "__main__":
     app.run(debug=True)

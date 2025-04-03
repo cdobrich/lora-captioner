@@ -1,38 +1,59 @@
 #!/bin/bash
 
-# Define the Hugging Face repository and file names
-REPO_ID="SmilingWolf/wd-v1-4-convnextv2-tagger-v2"
-MODEL_FILE="model.onnx"
-TAGS_FILE="selected_tags.csv"
+# Function to download model and tags
+download_model() {
+  local REPO_ID="$1"
+  local MODEL_DIR="./wd14_tagger_model/$(echo "$REPO_ID" | sed 's/\//_/g')"
+  local MODEL_FILE="model.onnx"
+  local TAGS_FILE="selected_tags.csv"
+  local RECORD_FILE="./wd14_tagger_model/model_choice.txt"
 
-# Define the local directory where the files should be stored
-MODEL_DIR="./wd14_tagger_model/SmilingWolf_wd-v1-4-convnextv2-tagger-v2"
+  mkdir -p "$MODEL_DIR"
 
-# Create the directories if they don't exist
-mkdir -p "$MODEL_DIR"
+  echo
+  echo "Gathering asset files for $REPO_ID"
+  echo
 
-echo
-echo "Gathering asset files"
-echo
-# Check if the model file already exists
-if [ -f "$MODEL_DIR/$MODEL_FILE" ]; then
-  echo "ONNX model already exists. Skipping download."
-else
-  # Download the model file
-  echo "Downloading ONNX model..."
-  curl -L "https://huggingface.co/$REPO_ID/resolve/main/$MODEL_FILE" -o "$MODEL_DIR/$MODEL_FILE"
-fi
+  # Check model file
+  if [ -f "$MODEL_DIR/$MODEL_FILE" ]; then
+    echo "Local ONNX model file found."
+  else
+    echo "Downloading ONNX model..."
+    curl -L "https://huggingface.co/$REPO_ID/resolve/main/$MODEL_FILE" -o "$MODEL_DIR/$MODEL_FILE"
+    echo "$REPO_ID" > "$MODEL_DIR/model.onnx.info"
+  fi
 
-# Check if the tags file already exists
-if [ -f "$MODEL_DIR/$TAGS_FILE" ]; then
-  echo "Tag list already exists. Skipping download."
-else
-  # Download the tags file
-  echo "Downloading tag list..."
-  curl -L "https://huggingface.co/$REPO_ID/resolve/main/$TAGS_FILE" -o "$MODEL_DIR/$TAGS_FILE"
-fi
+  # Check tags file
+  if [ -f "$MODEL_DIR/$TAGS_FILE" ]; then
+    echo "Local tag list file found."
+  else
+    echo "Downloading tag list..."
+    curl -L "https://huggingface.co/$REPO_ID/resolve/main/$TAGS_FILE" -o "$MODEL_DIR/$TAGS_FILE"
+    echo "$REPO_ID" > "$MODEL_DIR/selected_tags.csv.info"
+  fi
 
-echo
+  echo "$REPO_ID" > "$RECORD_FILE" #record the users choice in the base directory.
+  echo
+}
+
+# Present download options to the user
+echo "Choose a model to download:"
+echo "1. wd-v1-4-convnextv2-tagger-v2 (default)"
+echo "2. wd-vit-large-tagger-v3"
+read -p "Enter your choice (1 or 2): " choice
+
+case "$choice" in
+  1|"")
+    download_model "SmilingWolf/wd-v1-4-convnextv2-tagger-v2"
+    ;;
+  2)
+    download_model "SmilingWolf/wd-vit-large-tagger-v3"
+    ;;
+  *)
+    echo "Invalid choice. Downloading default model."
+    download_model "SmilingWolf/wd-v1-4-convnextv2-tagger-v2"
+    ;;
+esac
 
 # Create and activate a Python virtual environment
 echo "Creating and activating virtual environment..."
@@ -42,6 +63,7 @@ source venv/bin/activate
 # Install dependencies from requirements.txt
 echo "Installing dependencies..."
 pip install -r requirements.txt
+
 echo
 echo "Setup complete!"
 echo

@@ -81,6 +81,13 @@
                 {% endif %}
             {% endif %}
         </div>
+        <div>
+            {% if selected_repo %}
+                <p>Selected Model: {{ selected_repo.split('/')[-1] }}</p>
+            {% else %}
+                <p>Selected Model: wd-v1-4-convnextv2-tagger-v2</p>
+            {% endif %}
+        </div>
         <form method="POST" class="row g-3" id="captionForm">
             <div class="col-md-6">
                 <label for="train_data_dir" class="form-label">Image Folder:</label>
@@ -118,10 +125,12 @@
             <div class="col-md-6">
                 <label for="general_threshold" class="form-label">General Threshold:</label>
                 <input type="number" class="form-control" id="general_threshold" name="general_threshold" value="{{ request.form['general_threshold'] if request.form.get('general_threshold') else '0.35' }}" step="0.05">
+                <input type="range" class="form-range" id="general_threshold_range" name="general_threshold" min="0" max="1" step="0.05" value="{{ request.form['general_threshold'] if request.form.get('general_threshold') else '0.35' }}">
             </div>
             <div class="col-md-6">
                 <label for="character_threshold" class="form-label">Character Threshold:</label>
                 <input type="number" class="form-control" id="character_threshold" name="character_threshold" value="{{ request.form['character_threshold'] if request.form.get('character_threshold') else '0.7' }}" step="0.05">
+                <input type="range" class="form-range" id="character_threshold_range" name="character_threshold" min="0" max="1" step="0.05" value="{{ request.form['character_threshold'] if request.form.get('character_threshold') else '0.7' }}">
             </div>
             <div class="col-md-6">
                 <label for="max_data_loader_n_workers" class="form-label">Max Data Loader Workers:</label>
@@ -157,6 +166,10 @@
         const trainDataDir = document.getElementById('train_data_dir');
         const browseFolder = document.getElementById('browseFolder');
         const clearFolder = document.getElementById('clearFolder');
+        const generalThresholdRange = document.getElementById('general_threshold_range');
+        const generalThresholdInput = document.getElementById('general_threshold');
+        const characterThresholdRange = document.getElementById('character_threshold_range');
+        const characterThresholdInput = document.getElementById('character_threshold');
 
         // Load Dark Mode state from localStorage
         if (localStorage.getItem('darkMode') === 'enabled') {
@@ -196,6 +209,22 @@
 
         clearFolder.addEventListener('click', function() {
             trainDataDir.value = '';
+        });
+
+        generalThresholdRange.addEventListener('input', function() {
+            generalThresholdInput.value = this.value;
+        });
+
+        generalThresholdInput.addEventListener('input', function() {
+            generalThresholdRange.value = this.value;
+        });
+
+        characterThresholdRange.addEventListener('input', function() {
+            characterThresholdInput.value = this.value;
+        });
+
+        characterThresholdInput.addEventListener('input', function() {
+            characterThresholdRange.value = this.value;
         });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
