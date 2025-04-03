@@ -45,5 +45,5 @@ pip install -r requirements.txt
 echo
 echo "Setup complete!"
 echo
-echo "You may run: python start.py"
+echo "You may run: bash start.sh"
 echo

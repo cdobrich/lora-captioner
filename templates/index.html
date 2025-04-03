@@ -92,7 +92,7 @@
             </div>
             <div class="col-md-6">
                 <label for="caption_extension" class="form-label">Caption Extension:</label>
-                <input type="text" class="form-control" id="caption_extension" name="caption_extension" value=".txt">
+                <input type="text" class="form-control" id="caption_extension" name="caption_extension" value="{{ request.form['caption_extension'] if request.form.get('caption_extension') else '.txt' }}">
             </div>
 
             <div class="col-md-12">
@@ -105,44 +105,40 @@
             </div>
             <div class="col-md-6">
                 <label for="caption_separator" class="form-label">Caption Separator:</label>
-                <input type="text" class="form-control" id="caption_separator" name="caption_separator" value=", ">
+                <input type="text" class="form-control" id="caption_separator" name="caption_separator" value="{{ request.form['caption_separator'] if request.form.get('caption_separator') else ', ' }}">
             </div>
             <div class="col-md-6">
                 <label for="tag_replacement" class="form-label">Tag Replacement:</label>
-                <input type="text" class="form-control" id="tag_replacement" name="tag_replacement">
+                <input type="text" class="form-control" id="tag_replacement" name="tag_replacement" value="{{ request.form['tag_replacement'] if request.form.get('tag_replacement') else '' }}">
             </div>
             <div class="col-md-6">
                 <label for="batch_size" class="form-label">Batch Size:</label>
-                <input type="number" class="form-control" id="batch_size" name="batch_size" value="1">
+                <input type="number" class="form-control" id="batch_size" name="batch_size" value="{{ request.form['batch_size'] if request.form.get('batch_size') else '1' }}">
             </div>
             <div class="col-md-6">
                 <label for="general_threshold" class="form-label">General Threshold:</label>
-                <input type="number" class="form-control" id="general_threshold" name="general_threshold" value="0.35" step="0.05">
+                <input type="number" class="form-control" id="general_threshold" name="general_threshold" value="{{ request.form['general_threshold'] if request.form.get('general_threshold') else '0.35' }}" step="0.05">
             </div>
             <div class="col-md-6">
                 <label for="character_threshold" class="form-label">Character Threshold:</label>
-                <input type="number" class="form-control" id="character_threshold" name="character_threshold" value="0.35" step="0.05">
+                <input type="number" class="form-control" id="character_threshold" name="character_threshold" value="{{ request.form['character_threshold'] if request.form.get('character_threshold') else '0.7' }}" step="0.05">
             </div>
             <div class="col-md-6">
                 <label for="max_data_loader_n_workers" class="form-label">Max Data Loader Workers:</label>
-                <input type="number" class="form-control" id="max_data_loader_n_workers" name="max_data_loader_n_workers" value="2">
-            </div>
-            <div class="col-md-6">
-                <label for="thresh" class="form-label">Threshold:</label>
-                <input type="number" class="form-control" id="thresh" name="thresh" value="0.35" step="0.05">
+                <input type="number" class="form-control" id="max_data_loader_n_workers" name="max_data_loader_n_workers" value="{{ request.form['max_data_loader_n_workers'] if request.form.get('max_data_loader_n_workers') else '2' }}">
             </div>
             <div class="col-md-12">
                 <div class="d-flex align-items-center">
                     <div class="form-check me-3">
-                        <input type="checkbox" class="form-check-input" id="frequency_tags" name="frequency_tags" checked>
+                        <input type="checkbox" class="form-check-input" id="frequency_tags" name="frequency_tags" {% if request.form.get('frequency_tags') == 'on' or not request.form.get('frequency_tags') %}checked{% endif %}>
                         <label class="form-check-label" for="frequency_tags">Frequency Tags</label>
                     </div>
                     <div class="form-check me-3">
-                        <input type="checkbox" class="form-check-input" id="append_tags" name="append_tags">
+                        <input type="checkbox" class="form-check-input" id="append_tags" name="append_tags" {% if request.form.get('append_tags') == 'on' %}checked{% endif %}>
                         <label class="form-check-label" for="append_tags">Append Tags</label>
                     </div>
                     <div class="form-check">
-                        <input type="checkbox" class="form-check-input" id="remove_underscore" name="remove_underscore" checked>
+                        <input type="checkbox" class="form-check-input" id="remove_underscore" name="remove_underscore" {% if request.form.get('remove_underscore') == 'on' or not request.form.get('remove_underscore') %}checked{% endif %}>
                         <label class="form-check-label" for="remove_underscore">Remove Underscore</label>
                     </div>
                 </div>
@@ -167,6 +163,8 @@
             document.body.classList.add('dark-mode');
             document.documentElement.setAttribute('data-bs-theme', 'dark');
             darkModeToggle.checked = true;
+        } else {
+            document.documentElement.setAttribute('data-bs-theme', 'light');
         }
 
         darkModeToggle.addEventListener('change', function () {
