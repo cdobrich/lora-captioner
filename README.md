@@ -1,6 +1,6 @@
-# LoRA-Captioner for Non-Nvidia GPUs.
+# ***IMPORTANT***: THIS PROJECT IS STILL UNDER DEVELOPMENT. THE RESULTS ARE NOT YET SATISFACTORY.
 
-***IMPORTANT***: THIS PROJECT IS STILL UNDER DEVELOPMENT. THE RESULTS ARE NOT YET SATISFACTORY.
+# LoRA-Captioner for Non-Nvidia GPUs.
 
 This is an image tagging tool for Stable Diffusion LoRAs for use on non-Nvidia GPUs. In theory it should even work on just a pure CPU. It was inspired by the [kohya_ss](https://github.com/bmaltais/kohya_ss) project. It uses the same resources, so this is like using the WD14 captioning tool.
 
